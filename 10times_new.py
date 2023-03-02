@@ -1,8 +1,5 @@
-import bs4
-from selenium.webdriver import Chrome, ChromeOptions as Options
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.support.ui import WebDriverWait
 from bs4 import BeautifulSoup
+import os
 import time
 import requests
 import json
@@ -12,7 +9,7 @@ month_format = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4,
                 "May": 5, "Jun": 6, "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
 Category = {"Agriculture & Forestry": "agriculture-forestry", "Animals & Pets": "animals-pets", "Apparel & Clothing": "apparel-fashion",
             "Arts & Crafts": "arts-crafts", "Auto & Automotive": "automotive", "Baby, Kids & Maternity": "baby-kids",
-            "Banking & Finance": "finance", "building-construction": "Building & Construction", "Business Services": "business-consultancy",
+            "Banking & Finance": "finance", "Building & Construction": "building-construction", "Business Services": "business-consultancy",
             "Education & Training": "education-training", "Electric & Electronics": "electronics-electricals", "Entertainment & Media": "entertainment",
             "Environment & Waste": "waste-management", "Fashion & Beauty": "fashion-accessories", "Food & Beverages": "food-beverage",
             "Home & Office": "home-office", "Hospitality": "hospitality", "It & Technology": "technology",
@@ -21,57 +18,6 @@ Category = {"Agriculture & Forestry": "agriculture-forestry", "Animals & Pets": 
             "Science & Research": "research", "Security & Defense": "security", "Telecommunication": "telecommunication",
             "Travel & Tourism": "travel-tourism", "Wellness, Health & Fitness": "wellness-healthcare"
             }
-
-
-def crawler_init():
-
-    # driver = Chrome(executable_path="./chromedriver")
-    driver = Chrome(ChromeDriverManager().install())
-    web_root = "https://10times.com/tradeshows"
-    web_root = "https://10times.com/events"
-    driver.get(web_root)
-    with open("cookies.json", "r") as f:
-        cookies = json.load(f)
-    for cookie in cookies:
-        driver.add_cookie(cookie)
-    driver.refresh()
-    # ua = UserAgent(use_cache_server=False, verify_ssl=False, cache=False)
-    ua = UserAgent()
-    return driver, ua
-
-
-# def process(driver: Chrome, ua: UserAgent):
-#     json_data = []
-#     limit = 400
-#     old_len = 0
-#     while True:
-#         soup = BeautifulSoup(driver.page_source, "lxml")
-#         time.sleep(5)
-#         js = "window.scrollTo(0, document.body.scrollHeight);"
-#         time.sleep(5)
-#         # WebDriverWait(driver, 20)
-#         driver.execute_script(js)
-#         time.sleep(5)
-#         print("scroll up")
-#         # WebDriverWait(driver, 20)
-#         driver.execute_script('window.scrollBy(0,-100);')
-#         result_list = soup.find_all(
-#             class_="row py-2 mx-0 mb-3 bg-white deep-shadow event-card")  # 找展覽清單
-#         print(len(result_list))
-#         # print(result_list[0])
-#         for result in result_list[old_len:len(result_list)]:
-#             event_url = result.find(
-#                 "a", class_="text-decoration-none c-ga xn").get("href")
-#             out = process_content(event_url, ua)
-#             json_data.append(out)
-#             time.sleep(2)
-#             if len(json_data) >= limit:
-#                 return json_data
-#         old_len = len(result_list)
-#         # print(result_list[1].find(
-#         #     "a", class_="text-decoration-none c-ga xn").get("href"))
-#         # print(len(result_list))
-#         # print("is scroll")
 
 
 # //*[@id = "content"]/tr[1]
@@ -242,6 +188,7 @@ def process(url, category):
         # print(item.get("href"))
         data = process_content(item.get("href"), category, ua)
         json_data.append(data)
+        time.sleep(1)
     return json_data
 
 
@@ -249,13 +196,15 @@ def main():
     root = "https://10times.com/top100/"
     print(len(Category))
     for key, item in Category.items():
+        if os.path.exists(f"out/{item}.json"):
+            continue
         print(key, item)
         # res = requests.get(f"https://10times.com/top100/{item}")
         json_data = process(f"https://10times.com/top100/{item}", key)
         json_object = json.dumps(json_data)
         with open(f"out/{item}.json", 'a') as f:
             f.write(json_object)
-        break
+        # break
         # print(res.status_code)
 
 
