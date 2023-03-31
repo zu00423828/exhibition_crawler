@@ -1,12 +1,13 @@
-from bs4 import BeautifulSoup
+import re
 import os
 import time
 import requests
 import json
+from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 from tqdm import tqdm
-month_format = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4,
-                "May": 5, "Jun": 6, "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}
+month_format = {"Jan": "01", "Feb": "02", "Mar": "03", "Apr": "04",
+                "May": "05", "Jun": "06", "Jul": "07", "Aug": "08", "Sep": "09", "Oct": "10", "Nov": "11", "Dec": "12"}
 Category = {"Agriculture & Forestry": "agriculture-forestry", "Animals & Pets": "animals-pets", "Apparel & Clothing": "apparel-fashion",
             "Arts & Crafts": "arts-crafts", "Auto & Automotive": "automotive", "Baby, Kids & Maternity": "baby-kids",
             "Banking & Finance": "finance", "Building & Construction": "building-construction", "Business Services": "business-consultancy",
@@ -29,7 +30,6 @@ def process_location(location):
 
 def process_date(date):
     date_format = date.strip().replace("  ", " ").split(" ")
-    print(len(date_format))
     year = date_format[-1]
     if len(date_format) == 5:
         start_month = month_format[date_format[1]]
@@ -44,20 +44,26 @@ def process_date(date):
     return f"{year}-{start_month}-{start_day}", f"{year}-{end_month}-{end_day}"
 
 
-def get_logo(soup: BeautifulSoup):
-    #online-header-left > div > div.me-3 > img
+# def get_logo(soup: BeautifulSoup):
+#     #online-header-left > div > div.me-3 > img
 
-    # result = soup.find(
-    #     class_="img-thumbnail img-130 lazyload")
-    results = soup.select("img.img-thumbnail.img-130.lazyload")
-    # print(type(result))
-    if len(results) < 1:
-        results = soup.select("img.img-thumbnail.mt-1.lazyload")
-        if len(results) < 1:
-            return ""
-        return results[0].get("data-src")
-    # return result.get("src")
-    return results[0].get("src")
+#     # result = soup.find(
+#     #     class_="img-thumbnail img-130 lazyload")
+#     results = soup.select("img.img-thumbnail.img-130.lazyload")
+#     # print(type(result))
+#     if len(results) < 1:
+#         results = soup.select("img.img-thumbnail.mt-1.lazyload")
+#         if len(results) < 1:
+#             return ""
+#         return results[0].get("data-src")
+#     # return result.get("src")
+#     return results[0].get("src")
+
+def get_logo(soup: BeautifulSoup):
+    results = soup.find("img", alt="logo")
+    url = results.get(
+        "data-src") if "default.png" in results.get("src") else results.get("src")
+    return url
 
 
 def process_content(url, category, ua):
@@ -78,7 +84,6 @@ def process_content(url, category, ua):
         venue_name, \
         venue_address = [""]*16
 
-    print("url", url)
     headers = {'user-agent': ua.random}
     res = requests.get(url, headers)
     soup = BeautifulSoup(res.text, "lxml")
@@ -96,12 +101,10 @@ def process_content(url, category, ua):
         if len(items) < 1:
             date_text = soup.select(
                 "#online-header-left > div > div.w-100 > div.header_date.position-relative.text-orange > span:nth-child(1)")
-            print("hint", date_text[0].text)
             event_date = date_text[0].text.replace("-", '')
             event_date_from,  event_date_to = process_date(event_date)
             event_venue, event_country = process_location(soup.select(
                 "#online-header-left > div > div.w-100 > div:nth-child(4)")[0].text)
-
         else:
             event_date = items[0].find_all("span")[1].text
             event_date = event_date.replace('-', '')
@@ -150,8 +153,15 @@ def process_content(url, category, ua):
         if venue_name == "":
             venue_name = event_venue.rsplit(",")[0].strip()
     try:
-        venue_address = soup.find(
-            "section", class_="box map_dir").find("p").text
+        # venue_address = soup.find(
+        #     "section", class_="box map_dir").find("p").text
+        venue_address_item = soup.find(
+            "section", class_="box map_dir").find("p")
+        # venue_address_clear = str(venue_address_item).replace("<p>", "").replace(
+        #     "</p>", "").replace("<br>", "").replace("<br/>", '').replace("<span>", "")
+        # venue_address = " ".join(venue_address_clear.split("</span>")).strip()
+        venue_address = re.sub(
+            "<p>|</p>|<span>|</span>|<br>|<br/>", " ", str(venue_address_item)).replace("  ", " ").strip()
     except:
         pass
     content = {
@@ -184,11 +194,11 @@ def process(url, category):
     top100_list = soup.findAll("a", class_="text-decoration-none me-2")
     print(len(top100_list))
     json_data = []
-    for item in top100_list:
+    for item in tqdm(top100_list):
         # print(item.get("href"))
         data = process_content(item.get("href"), category, ua)
         json_data.append(data)
-        time.sleep(1)
+        time.sleep(0.3)
     return json_data
 
 
