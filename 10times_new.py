@@ -6,6 +6,7 @@ import json
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
 from tqdm import tqdm
+from multiprocessing import Pool
 month_format = {"Jan": "01", "Feb": "02", "Mar": "03", "Apr": "04",
                 "May": "05", "Jun": "06", "Jul": "07", "Aug": "08", "Sep": "09", "Oct": "10", "Nov": "11", "Dec": "12"}
 Category = {"Agriculture & Forestry": "agriculture-forestry", "Animals & Pets": "animals-pets", "Apparel & Clothing": "apparel-fashion",
@@ -103,8 +104,12 @@ def process_content(url, category, ua):
                 "#online-header-left > div > div.w-100 > div.header_date.position-relative.text-orange > span:nth-child(1)")
             event_date = date_text[0].text.replace("-", '')
             event_date_from,  event_date_to = process_date(event_date)
-            event_venue, event_country = process_location(soup.select(
-                "#online-header-left > div > div.w-100 > div:nth-child(4)")[0].text)
+            event_location = soup.select(
+                "#online-header-left > div > div.w-100 > div:nth-child(4)")[0].text
+            if "Get Directions" not in event_location:
+                event_location = soup.select(
+                    "#online-header-left > div > div.w-100 > div:nth-child(5)")[0].text
+            event_venue, event_country = process_location(event_location)
         else:
             event_date = items[0].find_all("span")[1].text
             event_date = event_date.replace('-', '')
@@ -186,20 +191,47 @@ def process_content(url, category, ua):
 
 
 def process(url, category):
-    ip = "116.98.180.2:10003"
+    ip = "20.159.154.112:8080"
     proxy = {'http': ip, 'https': ip}
     proxy = None
     res = requests.get(url)
     soup = BeautifulSoup(res.text, "lxml")
     top100_list = soup.findAll("a", class_="text-decoration-none me-2")
-    print(len(top100_list))
+    # print(len(top100_list))
     json_data = []
+    # ua = UserAgent()
     for item in tqdm(top100_list):
         # print(item.get("href"))
         data = process_content(item.get("href"), category, ua)
         json_data.append(data)
         time.sleep(0.3)
     return json_data
+
+
+def mulit_crawler(data):
+    key = data[0]
+    item = data[1]
+    if os.path.exists(f"out/{item}.json"):
+        return
+    print(key, item)
+    # res = requests.get(f"https://10times.com/top100/{item}")
+    print("hi")
+    json_data = process(f"https://10times.com/top100/{item}", key)
+    print("hi2")
+    json_object = json.dumps(json_data)
+    with open(f"out/{item}.json", 'a') as f:
+        f.write(json_object)
+    return 1
+
+
+def mulit_main():
+    pool = Pool(4)
+    pool_outputs = pool.map(mulit_crawler, Category.items())
+    print('將不會阻塞並和 pool.map_async 並行觸發')
+
+    # close 和 join 是確保主程序結束後，子程序仍然繼續進行
+    pool.close()
+    pool.join()
 
 
 def main():
@@ -221,3 +253,4 @@ def main():
 if __name__ == "__main__":
     ua = UserAgent()
     main()
+    # mulit_main()
